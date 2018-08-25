@@ -2,105 +2,55 @@ package bf.car;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
-import java.util.stream.Stream;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
-import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-
-import static bf.car.ZeroTo60.ZERO_60;
 
 public class UsNews {
 
   private static Logger logger = Logger.getLogger(UsNews.class);
 
   public static void main(String[] args) throws Exception {
-    Set<String> urls = new HashSet<>();
-    try (Stream<String> lines = Files.lines(Paths.get(ZERO_60));
-         BufferedWriter writer = Files.newBufferedWriter(Paths.get("usnews.csv"));
-         CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT)
+    List<String> lines = Files.readAllLines(Paths.get("make-model-year.csv"));
+
+    try (
+            BufferedWriter writer = Files.newBufferedWriter(Paths.get("usnews.csv"));
+            CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT)
     ) {
-      for (String line : (Iterable<String>) lines::iterator) {
-        line = line.replace("&nbsp;", ",");
+      lines.stream().parallel().forEach(line -> {
         String[] car = line.split(",");
-        String yearStr = car[0];
-        int year = Integer.parseInt(yearStr);
-        if (year < 2016) continue;
+        String year = car[0];
+        String make = car[1].replace(" ", "-");
+        String model = car[2].replace(" ", "-");
 
-        String make = car[1];
-        if (make.equals("audi")
-                || make.equals("bmw")
-                || make.equals("bentley")
-                || make.equals("bugatti")
-                || make.equals("alfa")
-                || make.equals("aston")
-                || make.equals("cadillac")
-                || make.equals("callaway")
-                || make.equals("caterham")
-                || make.equals("citroen")
-                || make.equals("ferrari")
-                || make.equals("fiat")
-                || make.equals("jaguar")
-                || make.equals("jeep")
-                || make.equals("koenigsegg")
-                || make.equals("lamborghini")
-                || make.equals("land")
-                || make.equals("lotus")
-                || make.equals("range")
-                || make.equals("mercedes")
-                || make.equals("maserati")
-                || make.equals("mclaren")
-                || make.equals("morgan")
-                || make.equals("peugeot")
-                || make.equals("proton")
-                || make.equals("skoda")
-                || make.equals("ram")
-                || make.equals("renault")
-                || make.equals("seat")
-                || make.equals("smart")
-                || make.equals("ssangyong")
-                || make.equals("suzuki")
-                || make.equals("tesla")
-                || make.equals("vauxhall")
-                || make.equals("volvo")
-                || make.equals("ariel")) continue;
-        String model = car[2];
+        String url = String.format("https://cars.usnews.com/cars-trucks/%s/%s", make, model);
+        if (!year.equals("2018")) url += "/" + year;
+        String fileName = String.format("usnews/%s_%s_%s", make, model, year) + ".html";
 
-        if (model.equals("santa")) {
-          model = car[2] + "-" + car[3];
-        }
-
-        if (make.equals("mazda")) {
-          if (model.length() == 1)
-            model = "mazda" + model;
-          else if (model.equals("mx-5")) {
-            model = "mx-5-miata";
-          }
-        }
-
-        String url = String.format("https://cars.usnews.com/cars-trucks/%s/%s/%s", make, model, yearStr);
-        String fileName = String.format("usnews/%s_%s_%s", make, model, yearStr) + ".html";
-
-        if (urls.contains(url)) continue;
-        urls.add(url);
-
-        Document doc;
+        Document doc = null;
 
         if (new File(fileName).exists()) {
-          String content = new Scanner(new File(fileName)).useDelimiter("\\Z").next();
+          String content = null;
+          try {
+            content = new Scanner(new File(fileName)).useDelimiter("\\Z").next();
+          } catch (FileNotFoundException e) {
+            logger.error(e);
+          }
+          if (content == null) return;
           doc = Jsoup.parse(content);
         } else {
           try {
@@ -111,12 +61,11 @@ public class UsNews {
             try (Writer writer1 = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))) {
               writer1.write(html);
             }
-          } catch (HttpStatusException e) {
+          } catch (Exception e) {
             logger.warn(e);
-            continue;
           }
         }
-
+        if (doc == null) return;
         Elements mpgs = doc.select("#mpg > div > strong");
 
         String mpg1 = "";
@@ -161,16 +110,19 @@ public class UsNews {
             isSafety = true;
           }
         }
-/*
         logger.debug(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", year, make, model,
                                    overall.html(),
                                    safety,
                                    reliability.attr("alt"),
-                                   mpg1, mpg2, mpg3, mpg4));*/
-        csvPrinter.printRecord(year, make, model,
-                               format(overall.html()), format(safety), format(reliability.attr("alt")),
-                               format(mpg1), format(mpg2), format(mpg3), format(mpg4));
-      }
+                                   mpg1, mpg2, mpg3, mpg4));
+        try {
+          csvPrinter.printRecord(year, make, model,
+                                 format(overall.html()), format(safety), format(reliability.attr("alt")),
+                                 format(mpg1), format(mpg2), format(mpg3), format(mpg4));
+        } catch (IOException e) {
+          logger.error(e);
+        }
+      });
       csvPrinter.flush();
     }
   }
