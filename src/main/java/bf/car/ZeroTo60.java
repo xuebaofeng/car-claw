@@ -15,7 +15,7 @@ import org.jsoup.select.Elements;
 
 public class ZeroTo60 {
 
-  public static final String ZERO_60 = "0-60.csv";
+  private static final String ZERO_60 = "0-60.csv";
   private static Logger logger = Logger.getLogger(ZeroTo60.class);
 
   public static void main(String[] args) throws IOException {
@@ -23,7 +23,7 @@ public class ZeroTo60 {
     Elements elements = doc.select("#browseByMake > li > a");
     try (
             BufferedWriter writer = Files.newBufferedWriter(Paths.get(ZERO_60));
-            CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);
+            CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT)
     ) {
       for (Element element : elements) {
         String makeLink = element.attr("href");
