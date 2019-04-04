@@ -22,7 +22,7 @@ public class UsNewsMakeModelYear {
 
       stream.filter(l -> l.contains("\"url\""))
             .forEach(l -> {
-              String car = l.split(" {20}\"url\": \"/cars-trucks/")[1].split("\",")[0];
+              String car = l.split("\"url\": \"/cars-trucks/")[1].split("\",")[0];
               if (l.contains("200")) return;
               logger.debug(l);
               String[] split = car.split("/");
